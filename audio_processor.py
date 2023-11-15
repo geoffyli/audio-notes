@@ -6,6 +6,8 @@ import tempfile
 import assemblyai as aai
 # Threading
 import threading
+# OS
+import os
 
 aai.settings.api_key = "0d3d110e7c34441c83126e4e5a74cdf6"
 
@@ -47,3 +49,11 @@ class AudioProcessor:
         finally:
             # Make sure to release the lock, even in case of error.
             self.lock.release()
+
+    def export_audio_segment(self, start: int, end: int, folder_path: str, filename:str):
+        # Slice audio
+        audio_segment = self.audio[start:end]
+        # Concat full path
+        full_path = os.path.join(folder_path, filename)
+        # Export mp3 file
+        audio_segment.export(full_path, format="mp3")

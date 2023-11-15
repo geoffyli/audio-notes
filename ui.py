@@ -5,7 +5,8 @@ import customtkinter as ctk
 import threading
 # Import modules
 from audio_processor import AudioProcessor
-
+import settings
+import os
 
 ctk.set_appearance_mode("System")  # Modes: "System" (standard), "Dark", "Light"
 ctk.set_default_color_theme("blue")  # Themes: "blue" (standard), "green", "dark-blue"
@@ -53,7 +54,11 @@ class App(ctk.CTk):
 
         # set default values
         self.slider_2.configure(command=self.progressbar_3.set)
-    
+
+        # Bind keys
+        self.bind("<Up>", self.up_and_down_key)
+        self.bind("<Down>", self.up_and_down_key)
+
     def set_player_frame(self):
         self.player_frame.rowconfigure((0, 1), weight=1)
         self.player_frame.columnconfigure(0, weight=1)
@@ -99,30 +104,61 @@ class App(ctk.CTk):
         self.set_processing_status()
         thread = threading.Thread(target=self.set_transcript_result, args=())
         thread.start()
-    
+
     def set_transcript_result(self):
         # Get audio path
-        file_path = self.file_path_box.get("1.0", ctk.END).strip()
         # Load audio and transcript
-        self.audio_processor.load_audio(file_path)
+        self.audio_processor.load_audio(settings.file_path)
         self.audio_processor.transcribe()
         # Set content frame
         self.content_frame = TranscriptFrame(self, self.audio_processor)
 
     def browseFiles(self):
-        filename = filedialog.askopenfilename(
-            initialdir="/Users/geoffyli/Documents/Projects/Python/SpeechToText",
+        settings.file_path = filedialog.askopenfilename(
+            initialdir="/Users/geoffyli/Library/CloudStorage/GoogleDrive-lyl1719770869@gmail.com/My Drive/Courses/TOEFL/23托福听力真题/23托福听力机经",
             title="Select a File",
             filetypes=(("Audio files", "*.mp3 *.wav *.ogg *.m4a"),),
         )
         self.file_path_box.delete("1.0", ctk.END)
-        self.file_path_box.insert("0.0", filename)
+        self.file_path_box.insert("0.0", settings.file_path)
 
     def set_processing_status(self):
         self.content_frame = ProcessingFrame(self)
         self.content_frame.grid(
             row=0, column=1, columnspan=2, padx=(20, 20), pady=(20, 10), sticky="nsew"
         )
+
+    def up_and_down_key(self, event):
+        transcript_frame = self.content_frame
+        view_top_scale = transcript_frame._parent_canvas.yview()[1]
+        view_bottom_scale = transcript_frame._parent_canvas.yview()[0]
+        lower_boundary = len(transcript_frame.utterances) * (view_top_scale - 0.4 * (view_top_scale - view_bottom_scale))
+        upper_boundary = len(transcript_frame.utterances) * (view_top_scale - 0.6 * (view_top_scale - view_bottom_scale))
+        if transcript_frame.cur_selected_no is not None:
+            if event.keysym == "Up":
+                if transcript_frame.cur_selected_no == 0:
+                    return
+                transcript_frame.select_new_utterance(
+                    transcript_frame.cur_selected_no - 1
+                )
+                print(transcript_frame.cur_selected_no, upper_boundary)
+                if transcript_frame.cur_selected_no < upper_boundary:
+                    transcript_frame._parent_canvas.yview("scroll", -16, "units") 
+
+            elif event.keysym == "Down":
+                if (
+                    transcript_frame.cur_selected_no
+                    == len(transcript_frame.utterances) - 1
+                ):
+                    return
+                transcript_frame.select_new_utterance(
+                    transcript_frame.cur_selected_no + 1
+                )
+                print(transcript_frame.cur_selected_no, lower_boundary)
+                if transcript_frame.cur_selected_no > lower_boundary:
+                    transcript_frame._parent_canvas.yview("scroll", 16, "units") 
+                
+
 
 
 class SiderbarFrame(ctk.CTkFrame):
@@ -169,34 +205,128 @@ class TranscriptFrame(ctk.CTkScrollableFrame):
         self.grid(
             row=0, column=1, columnspan=2, padx=(20, 20), pady=(20, 10), sticky="nsew"
         )
+
+        # Attributes
         self.sentences = audio_processor.sentences
         self.row_num = 0
-        # configure grid layout (4x4)
-        # self.grid_columnconfigure(0, weight=1)
         self.columnconfigure(0, weight=1)
+        # Configure selected
+        self.cur_selected_no = 0
+        # List of utterances
+        self.utterances = []
         for sentence in self.sentences:
-            UtteranceFrame(self, audio_processor, sentence, self.row_num)
-            self.row_num += 1        
+            self.utterances.append(
+                UtteranceFrame(
+                    self, audio_processor, sentence, self.row_num, self.cur_selected_no
+                )
+            )
+            self.row_num += 1
+
+    def select_new_utterance(self, new_no):
+        if self.cur_selected_no == new_no:
+            return
+        self.utterances[self.cur_selected_no].configure(border_width=0)
+        self.utterances[new_no].configure(
+            border_width=2, border_color="DarkOliveGreen2"
+        )
+        self.cur_selected_no = new_no
+
 
 class UtteranceFrame(ctk.CTkFrame):
-    def __init__(self, master, audio_processor, sentence, no, **kwargs):
+    def __init__(
+        self, master, audio_processor, sentence, no, cur_selected_no, **kwargs
+    ):
         super().__init__(master, **kwargs)
+        # Attributes
+        self.sentence = sentence
+        self.display = False
+        self.exported = False
+        self.no = no
+        self.cur_selected_no = cur_selected_no
+
         self.audio_processor = audio_processor
         self.grid_rowconfigure(0, weight=1)
         self.grid_rowconfigure(1, weight=1)
         self.grid_columnconfigure(0, weight=1)
-        self.grid_columnconfigure(1, weight=4)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_columnconfigure(2, weight=2)
+        self.grid_columnconfigure(3, weight=2)
+        self.grid_columnconfigure(4, weight=2)
         self.grid(row=no, column=0, sticky="wnes")
-        # button
-        self.btn = ctk.CTkButton(self, text="Play", command=lambda: self.play_audio_segment(sentence.start, sentence.end))
-        self.btn.grid(row=0, column=0, padx=(10, 10), pady=(5, 5), sticky="nesw")
+
+        # No. label
+        self.no_label = ctk.CTkLabel(self, text=str(no), fg_color="transparent")
+        self.no_label.grid(row=0, column=0, padx=(10, 10), pady=(5, 5), sticky="nesw")
+
+        # Checkbox
+        self.checkbox = ctk.CTkCheckBox(
+            self, text="", onvalue="on", offvalue="off", command=lambda: self.select()
+        )
+
+        # Play button
+        self.btn = ctk.CTkButton(
+            self,
+            text="Play",
+            command=lambda: self.play_audio_segment(sentence.start, sentence.end),
+        )
+        self.btn.grid(row=0, column=2, padx=(10, 10), pady=(5, 5), sticky="nesw")
+        # Display/Hide button
+        self.display_btn = ctk.CTkButton(
+            self, text="Show", command=lambda: self.display_or_hide()
+        )
+        self.display_btn.grid(
+            row=0, column=3, padx=(10, 10), pady=(5, 5), sticky="nesw"
+        )
+        # Export button
+        self.export_btn = ctk.CTkButton(
+            self,
+            text="Export",
+            command=lambda: self.export_audio_segment(sentence.start, sentence.end),
+        )
+        self.export_btn.grid(row=0, column=4, padx=(10, 10), pady=(5, 5), sticky="nesw")
+
+        # Text box
         self.textbox = ctk.CTkTextbox(self, height=52, wrap="word")
         self.textbox.grid(
-            row=1, column=0, columnspan=2, padx=(10, 10), pady=(0, 5), sticky="nsew"
+            row=1, column=0, columnspan=5, padx=(10, 10), pady=(0, 5), sticky="nsew"
         )
-        self.textbox.insert(index="0.0", text=sentence.text)
+
+        # Set border color
+        if self.no == 0:
+            self.configure(border_width=2, border_color="DarkOliveGreen2")
+        else:
+            self.configure(border_width=0)
+        # Bind the click event
+        self.bind("<Button-1>", self.on_click)
+
+    def on_click(self, event):
+        self.master.select_new_utterance(self.no)  # Your function logic here
+
+    def select(self):
+        self.master.select_new_utterance(self.no)
+
+    def display_or_hide(self):
+        if self.display:
+            # Hide transcript
+            self.textbox.delete("1.0", ctk.END)
+            self.display_btn.configure(text="Show")
+            self.display = False
+        else:
+            # Show transcript
+            self.textbox.delete("1.0", ctk.END)
+            self.textbox.insert("0.0", self.sentence.text)
+            self.display_btn.configure(text="Hide")
+            self.display = True
 
     def play_audio_segment(self, start, end):
-        thread = threading.Thread(target=self.audio_processor.play_audio_segment, args=(start, end))
+        thread = threading.Thread(
+            target=self.audio_processor.play_audio_segment, args=(start, end)
+        )
         thread.start()
 
+    def export_audio_segment(self, start, end):
+        folder_path = os.path.dirname(settings.file_path)
+        self.audio_processor.export_audio_segment(
+            start, end, folder_path, "sentence.mp3"
+        )
+        self.export_btn.configure(text="Exported")

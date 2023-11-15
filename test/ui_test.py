@@ -1,49 +1,44 @@
-from tkinter import *
+import tkinter as tk
 
-root = Tk()
-root.title("Profile Entry using Grid")
-root.geometry("500x300")  # set starting size of window
-root.maxsize(500, 300)  # width x height
-root.config(bg="lightgrey")
+class ScrollableFrame(tk.Frame):
+    def __init__(self, master, **kwargs):
+        super().__init__(master, **kwargs)
 
-# Enter specific information for your profile into the following widgets
-enter_info = Label(root, text="Please enter your information: ", bg="lightgrey")
-enter_info.grid(row=0, column=1, columnspan=4, padx=5, pady=5)
+        self.canvas = tk.Canvas(self)
+        self.scrollbar = tk.Scrollbar(self, orient="vertical", command=self.canvas.yview)
+        self.scrollable_frame = tk.Frame(self.canvas)
 
-# Name label and entry widgets
-Label(root, text="Name", bg="lightgrey").grid(row=1, column=1, padx=5, pady=5, sticky=E)
+        self.scrollable_frame.bind(
+            "<Configure>",
+            lambda e: self.canvas.configure(scrollregion=self.canvas.bbox("all"))
+        )
 
-name = Entry(root, bd=3)
-name.grid(row=1, column=2, padx=5, pady=5)
+        self.canvas.create_window((0, 0), window=self.scrollable_frame, anchor="nw")
+        self.canvas.configure(yscrollcommand=self.scrollbar.set)
 
-# Gender label and dropdown widgets
-gender = Menubutton(root, text="Gender")
-gender.grid(row=2, column=2, padx=5, pady=5, sticky=W)
-gender.menu = Menu(gender, tearoff=0)
-gender["menu"] = gender.menu
+        self.canvas.pack(side="left", fill="both", expand=True)
+        self.scrollbar.pack(side="right", fill="y")
 
-# choices in gender dropdown menu
-gender.menu.add_cascade(label="Male")
-gender.menu.add_cascade(label="Female")
-gender.menu.add_cascade(label="Other")
-gender.grid()
+        self.bind_arrow_keys()
 
-# Eyecolor label and entry widgets
-Label(root, text="Eye Color", bg="lightgrey").grid(row=3, column=1, padx=5, pady=5, sticky=E)
-eyes = Entry(root, bd=3)
-eyes.grid(row=3, column=2, padx=5, pady=5)
+    def scroll_up(self, event):
+        self.canvas.yview_scroll(-1, "units")  # Scroll up by a small increment
 
-# Height and Weight labels and entry widgets
-Label(root, text="Height", bg="lightgrey").grid(row=4, column=1, padx=5, pady=5, sticky=E)
-Label(root, text="inches", bg="lightgrey").grid(row=4, column=3, sticky=W)
+    def scroll_down(self, event):
+        self.canvas.yview_scroll(1, "units")  # Scroll down by a small increment
 
-height = Entry(root, bd=3)
-height.grid(row=4, column=2, padx=5, pady=5)
+    def bind_arrow_keys(self):
+        self.scrollable_frame.bind("<Up>", self.scroll_up)
+        self.scrollable_frame.bind("<Down>", self.scroll_down)
+        self.scrollable_frame.focus_set()  # Set focus to enable key bindings
 
-Label(root, text="Weight", bg="lightgrey").grid(row=5, column=1, padx=5, pady=5, sticky=E)
-Label(root, text="lbs", bg="lightgrey").grid(row=5, column=3, sticky=W)
+# Usage
+root = tk.Tk()
+sf = ScrollableFrame(root)
+sf.pack(fill="both", expand=True)
 
-weight = Entry(root, bd=3)
-weight.grid(row=5, column=2, padx=5, pady=5)
+# Add some content to the frame
+for i in range(50):
+    tk.Label(sf.scrollable_frame, text="Sample Label " + str(i)).pack()
 
 root.mainloop()
