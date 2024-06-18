@@ -2,11 +2,8 @@
 from pydub import AudioSegment
 from pydub.playback import play
 import tempfile
-# assembly ai
 import assemblyai as aai
-# Threading
 import threading
-# OS
 import os
 
 aai.settings.api_key = "0d3d110e7c34441c83126e4e5a74cdf6"
